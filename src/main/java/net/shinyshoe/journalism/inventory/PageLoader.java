@@ -10,7 +10,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.logging.Logger;
+import java.util.function.Consumer;
 
 final class PageLoader {
 
@@ -27,15 +27,15 @@ final class PageLoader {
             .thenComparing(Listing::name, String.CASE_INSENSITIVE_ORDER)
             .thenComparing(Listing::name);
 
-    private final Logger logger;
+    private final Consumer<String> warn;
     private final List<InventoryLayout> layouts = new ArrayList<>();
 
-    private PageLoader(final Logger logger) {
-        this.logger = logger;
+    private PageLoader(final Consumer<String> warn) {
+        this.warn = warn;
     }
 
-    static List<InventoryLayout> load(final File folder, final Logger logger) {
-        final PageLoader loader = new PageLoader(logger);
+    static List<InventoryLayout> load(final File folder, final Consumer<String> warn) {
+        final PageLoader loader = new PageLoader(warn);
         loader.loadChildren(folder, ID_ROOT, 1);
         return loader.layouts;
     }
@@ -71,7 +71,7 @@ final class PageLoader {
             }
             return listing;
         } catch (final IllegalArgumentException | ParsingException e) {
-            logger.warning("Skipping " + id + ": " + e.getMessage());
+            warn.accept("Skipping " + id + ": " + e.getMessage());
             return null;
         }
     }

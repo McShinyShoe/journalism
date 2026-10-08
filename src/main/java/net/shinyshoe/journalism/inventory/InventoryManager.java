@@ -1,5 +1,6 @@
 package net.shinyshoe.journalism.inventory;
 
+import io.papermc.paper.event.server.ServerResourcesReloadedEvent;
 import net.kyori.adventure.text.minimessage.ParsingException;
 import net.shinyshoe.journalism.Journalism;
 import org.bukkit.Bukkit;
@@ -31,6 +32,7 @@ public final class InventoryManager {
     private final Map<String, InventoryLayout> layouts = new HashMap<>();
     private final Map<String, Map<Character, Consumer<InventoryClickEvent>>> clickHandlers = new HashMap<>();
     private final Map<UUID, Deque<View>> menuStacks = new HashMap<>();
+    private int problems;
 
     public InventoryManager(final Journalism plugin) {
         this.plugin = plugin;
@@ -38,7 +40,20 @@ public final class InventoryManager {
         load();
     }
 
-    public void load() {
+    public int reload() {
+        load();
+        plugin.getServer().getOnlinePlayers().forEach(this::refresh);
+        return problems;
+    }
+
+    private void refresh(final Player player) {
+        if (player.getOpenInventory().getTopInventory().getHolder(false) instanceof LayoutHolder && !open(player)) {
+            player.closeInventory();
+        }
+    }
+
+    private void load() {
+        problems = 0;
         final File file = new File(plugin.getDataFolder(), FILE_NAME);
         if (!file.exists()) {
             plugin.saveResource(FILE_NAME, false);
@@ -52,7 +67,7 @@ public final class InventoryManager {
             try {
                 layouts.put(id, InventoryLayout.parse(id, section));
             } catch (final IllegalArgumentException | ParsingException e) {
-                plugin.getLogger().warning("Skipping inventory '" + id + "' in " + FILE_NAME + ": " + e.getMessage());
+                warn("Skipping inventory '" + id + "' in " + FILE_NAME + ": " + e.getMessage());
             }
         }
 
@@ -60,18 +75,27 @@ public final class InventoryManager {
         if (!pageFolder.exists()) {
             plugin.saveResources(PageLoader.FOLDER);
         }
-        for (final InventoryLayout layout : PageLoader.load(pageFolder, plugin.getLogger())) {
+        for (final InventoryLayout layout : PageLoader.load(pageFolder, this::warn)) {
             layouts.put(layout.id(), layout);
+        }
+
+        if (!layouts.containsKey(HOME_ID)) {
+            warn("There is no '" + HOME_ID + "' inventory in " + FILE_NAME + ", so /journal has nothing to open");
         }
 
         for (final InventoryLayout layout : layouts.values()) {
             layout.items().forEach((symbol, item) -> {
                 if (item.goTo() != null && !layouts.containsKey(item.goTo())) {
-                    plugin.getLogger().warning("Inventory '" + layout.id() + "' item '" + symbol
+                    warn("Inventory '" + layout.id() + "' item '" + symbol
                             + "' goes to '" + item.goTo() + "', which is not a loaded inventory");
                 }
             });
         }
+    }
+
+    private void warn(final String message) {
+        problems++;
+        plugin.getLogger().warning(message);
     }
 
     // opens the menu the player was last on
@@ -216,6 +240,12 @@ public final class InventoryManager {
         @EventHandler
         public void onPlayerQuit(final PlayerQuitEvent event) {
             menuStacks.remove(event.getPlayer().getUniqueId());
+        }
+
+        // the server's own /reload
+        @EventHandler
+        public void onServerResourcesReloaded(final ServerResourcesReloadedEvent event) {
+            reload();
         }
     }
 }

@@ -4,3 +4,8 @@ version: '${version}'
 main: net.shinyshoe.journalism.Journalism
 api-version: '26.2'
 load: POSTWORLD
+
+permissions:
+  journalism.reload:
+    description: Use /journal reload
+    default: op

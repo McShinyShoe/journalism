@@ -157,7 +157,7 @@ public record InventoryLayout(String id, Component title, List<String> rows, Map
 
     public enum Function {
         BACK,
-        HOME,1
+        HOME,
         NEXT,
         PREV;
 
