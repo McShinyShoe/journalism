@@ -1,0 +1,4 @@
+material: writable_book
+name: "<yellow>Example category"
+lore:
+  - "<white>Lists the entries in this folder"

@@ -1,0 +1,5 @@
+material: paper
+name: "<gold>Pinned"
+lore:
+  - "<white>Listed first because of sort_priority"
+sort_priority: 1

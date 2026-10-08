@@ -1,0 +1,11 @@
+# The item that stands for this section, category or entry wherever it is listed:
+#   material       Item id, for example book or minecraft:book.
+#   name           Optional item name (MiniMessage).
+#   lore           Optional list of lore lines (MiniMessage).
+#   sort_priority  Optional whole number. Listed lowest first and ahead of everything
+#                  without one, which is listed by folder name.
+
+material: book
+name: "<gold>Journals"
+lore:
+  - "<white>Access the journal you have found"

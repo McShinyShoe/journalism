@@ -30,7 +30,7 @@ public final class InventoryManager {
     private final Journalism plugin;
     private final Map<String, InventoryLayout> layouts = new HashMap<>();
     private final Map<String, Map<Character, Consumer<InventoryClickEvent>>> clickHandlers = new HashMap<>();
-    private final Map<UUID, Deque<String>> menuStacks = new HashMap<>();
+    private final Map<UUID, Deque<View>> menuStacks = new HashMap<>();
 
     public InventoryManager(final Journalism plugin) {
         this.plugin = plugin;
@@ -56,11 +56,19 @@ public final class InventoryManager {
             }
         }
 
+        final File pageFolder = new File(plugin.getDataFolder(), PageLoader.FOLDER);
+        if (!pageFolder.exists()) {
+            plugin.saveResources(PageLoader.FOLDER);
+        }
+        for (final InventoryLayout layout : PageLoader.load(pageFolder, plugin.getLogger())) {
+            layouts.put(layout.id(), layout);
+        }
+
         for (final InventoryLayout layout : layouts.values()) {
             layout.items().forEach((symbol, item) -> {
                 if (item.goTo() != null && !layouts.containsKey(item.goTo())) {
-                    plugin.getLogger().warning("Inventory '" + layout.id() + "' item '" + symbol + "' in " + FILE_NAME
-                            + " goes to '" + item.goTo() + "', which is not a loaded inventory");
+                    plugin.getLogger().warning("Inventory '" + layout.id() + "' item '" + symbol
+                            + "' goes to '" + item.goTo() + "', which is not a loaded inventory");
                 }
             });
         }
@@ -68,40 +76,57 @@ public final class InventoryManager {
 
     // opens the menu the player was last on
     public boolean open(final Player player) {
-        final Deque<String> stack = menuStack(player);
+        final Deque<View> stack = menuStack(player);
 
         // reset when reloaded
-        while (!stack.isEmpty() && !layouts.containsKey(stack.peek())) stack.pop();
+        while (stack.size() > 1 && !layouts.containsKey(stack.peek().id)) stack.pop();
 
-        final InventoryLayout layout = layouts.get(stack.isEmpty() ? HOME_ID : stack.peek());
+        final View view = stack.peek();
+        final InventoryLayout layout = layouts.get(view.id);
         if (layout == null) return false;
-        player.openInventory(new LayoutHolder(layout).getInventory());
+        view.page = Math.min(view.page, layout.pageCount() - 1);
+        player.openInventory(new LayoutHolder(layout, view.page).getInventory());
         return true;
     }
 
     public void goTo(final Player player, final String id) {
         if (!layouts.containsKey(id)) return;
-        final Deque<String> stack = menuStack(player);
-        if (!id.equals(stack.isEmpty() ? HOME_ID : stack.peek())) stack.push(id);
+        final Deque<View> stack = menuStack(player);
+        if (!id.equals(stack.peek().id)) stack.push(new View(id));
         open(player);
     }
 
     public void back(final Player player) {
-        final Deque<String> stack = menuStack(player);
-        if (stack.isEmpty()) return;
+        final Deque<View> stack = menuStack(player);
+        if (stack.size() == 1) return;
         stack.pop();
         open(player);
     }
 
     public void home(final Player player) {
-        final Deque<String> stack = menuStack(player);
-        if (stack.isEmpty()) return;
-        stack.clear();
+        final Deque<View> stack = menuStack(player);
+        if (stack.size() == 1) return;
+        while (stack.size() > 1) stack.pop();
         open(player);
     }
 
-    private Deque<String> menuStack(final Player player) {
-        return menuStacks.computeIfAbsent(player.getUniqueId(), key -> new ArrayDeque<>());
+    public void turnPage(final Player player, final int pages) {
+        final View view = menuStack(player).peek();
+        final InventoryLayout layout = layouts.get(view.id);
+        if (layout == null) return;
+        final int page = Math.clamp(view.page + pages, 0, layout.pageCount() - 1);
+        if (page == view.page) return;
+        view.page = page;
+        open(player);
+    }
+
+    // home stays at the bottom
+    private Deque<View> menuStack(final Player player) {
+        return menuStacks.computeIfAbsent(player.getUniqueId(), key -> {
+            final Deque<View> stack = new ArrayDeque<>();
+            stack.push(new View(HOME_ID));
+            return stack;
+        });
     }
 
     public void onClick(final String id, final char symbol, final Consumer<InventoryClickEvent> handler) {
@@ -116,16 +141,26 @@ public final class InventoryManager {
         }
     }
 
+    private static final class View {
+        private final String id;
+        private int page;
+
+        private View(final String id) {
+            this.id = id;
+        }
+    }
+
     private static final class LayoutHolder implements InventoryHolder {
         private final InventoryLayout layout;
+        private final InventoryLayout.Item[] items;
         private final Inventory inventory;
 
-        private LayoutHolder(final InventoryLayout layout) {
+        private LayoutHolder(final InventoryLayout layout, final int page) {
             this.layout = layout;
-            this.inventory = Bukkit.createInventory(this, layout.size(), layout.title());
-            for (int slot = 0; slot < layout.size(); slot++) {
-                final InventoryLayout.Item item = layout.itemAt(slot);
-                if (item != null) inventory.setItem(slot, item.createStack());
+            this.items = layout.itemsOn(page);
+            this.inventory = Bukkit.createInventory(this, layout.size(), layout.titleOn(page));
+            for (int slot = 0; slot < items.length; slot++) {
+                if (items[slot] != null) inventory.setItem(slot, items[slot].createStack());
             }
         }
 
@@ -150,7 +185,7 @@ public final class InventoryManager {
                     .get(holder.layout.symbolAt(slot));
             if (handler != null) handler.accept(event);
 
-            final InventoryLayout.Item item = holder.layout.itemAt(slot);
+            final InventoryLayout.Item item = holder.items[slot];
             if (item == null || !(event.getWhoClicked() instanceof Player player)) return;
             final String goTo = item.goTo();
             final InventoryLayout.Function function = item.function();
@@ -165,6 +200,8 @@ public final class InventoryManager {
                 switch (function) {
                     case BACK -> back(player);
                     case HOME -> home(player);
+                    case NEXT -> turnPage(player, 1);
+                    case PREV -> turnPage(player, -1);
                 }
             });
         }

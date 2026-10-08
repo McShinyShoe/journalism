@@ -7,6 +7,7 @@
 #             name      Optional item name (MiniMessage).
 #             lore      Optional list of lore lines (MiniMessage).
 #             goto      Optional id of the inventory to open when the item is clicked.
+#                       The data folder adds page/<section> and page/<section>/<category>.
 #             function  Optional button function, cannot be combined with goto:
 #                         back  Return to the previous inventory.
 #                         home  Return to main.
@@ -28,7 +29,7 @@ main:
       name: "<gold>Journals"
       lore:
         - "<white>Access the journal you have found"
-      goto: journals
+      goto: page/journals
     s:
       material: redstone_torch
       name: "<gray>Settings"
@@ -36,31 +37,14 @@ main:
         - "<white>Change Settings"
       goto: settings
 
-journals:
-  title: "Journals"
-  layout:
-    - "#########"
-    - "#       #"
-    - "b###h####"
-  items:
-    "#":
-      material: gray_stained_glass_pane
-      name: " "
-    b:
-      material: arrow
-      name: "<yellow>Back"
-      function: back
-    h:
-      material: arrow
-      name: "<green>Home"
-      function: home
-
 settings:
   title: "Settings"
   layout:
-    - "#########"
-    - "#       #"
     - "b###h####"
+    - "#       #"
+    - "#       #"
+    - "#       #"
+    - "#########"
   items:
     "#":
       material: gray_stained_glass_pane

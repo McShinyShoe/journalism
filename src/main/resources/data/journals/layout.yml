@@ -1,0 +1,37 @@
+# The inventory of this section, id page/journals. Same keys as an inventory in inventory.yml, plus:
+#   Empty slots list the categories in this folder, clicking one opens page/journals/<category>.
+#   In the layout of a category they list its entries instead.
+#   function  Also takes next and prev, which turn the page when there are more than fit.
+#   %page% and %pages% in the title, a name or lore are the current page and the number of pages.
+
+title: "Journals"
+layout:
+  - "b###h####"
+  - "#       #"
+  - "#       #"
+  - "#       #"
+  - "#       #"
+  - "###pin###"
+items:
+  "#":
+    material: gray_stained_glass_pane
+    name: " "
+  b:
+    material: arrow
+    name: "<yellow>Back"
+    function: back
+  h:
+    material: arrow
+    name: "<green>Home"
+    function: home
+  p:
+    material: arrow
+    name: "<yellow>Previous page"
+    function: prev
+  i:
+    material: paper
+    name: "<white>Page %page%/%pages%"
+  n:
+    material: arrow
+    name: "<yellow>Next page"
+    function: next
