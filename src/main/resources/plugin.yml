@@ -1,0 +1,6 @@
+name: Journalism
+version: '${version}'
+
+main: net.shinyshoe.journalism.Journalism
+api-version: '26.2'
+load: POSTWORLD
