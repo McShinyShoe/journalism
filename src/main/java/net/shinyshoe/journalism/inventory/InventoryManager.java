@@ -3,6 +3,7 @@ package net.shinyshoe.journalism.inventory;
 import io.papermc.paper.event.server.ServerResourcesReloadedEvent;
 import net.kyori.adventure.text.minimessage.ParsingException;
 import net.shinyshoe.journalism.Journalism;
+import net.shinyshoe.journalism.entry.Entry;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -30,6 +31,7 @@ public final class InventoryManager {
 
     private final Journalism plugin;
     private final Map<String, InventoryLayout> layouts = new HashMap<>();
+    private final Map<String, Entry> entries = new HashMap<>();
     private final Map<String, Map<Character, Consumer<InventoryClickEvent>>> clickHandlers = new HashMap<>();
     private final Map<UUID, Deque<View>> menuStacks = new HashMap<>();
     private int problems;
@@ -75,9 +77,12 @@ public final class InventoryManager {
         if (!pageFolder.exists()) {
             plugin.saveResources(PageLoader.FOLDER);
         }
-        for (final InventoryLayout layout : PageLoader.load(pageFolder, this::warn)) {
+        final PageLoader.Pages pages = PageLoader.load(pageFolder, this::warn);
+        for (final InventoryLayout layout : pages.layouts()) {
             layouts.put(layout.id(), layout);
         }
+        entries.clear();
+        entries.putAll(pages.entries());
 
         if (!layouts.containsKey(HOME_ID)) {
             warn("There is no '" + HOME_ID + "' inventory in " + FILE_NAME + ", so /journal has nothing to open");
@@ -85,9 +90,9 @@ public final class InventoryManager {
 
         for (final InventoryLayout layout : layouts.values()) {
             layout.items().forEach((symbol, item) -> {
-                if (item.goTo() != null && !layouts.containsKey(item.goTo())) {
+                if (item.goTo() != null && !layouts.containsKey(item.goTo()) && !entries.containsKey(item.goTo())) {
                     warn("Inventory '" + layout.id() + "' item '" + symbol
-                            + "' goes to '" + item.goTo() + "', which is not a loaded inventory");
+                            + "' goes to '" + item.goTo() + "', which is not a loaded inventory or entry");
                 }
             });
         }
@@ -114,6 +119,11 @@ public final class InventoryManager {
     }
 
     public boolean goTo(final Player player, final String id) {
+        final Entry entry = entries.get(id);
+        if (entry != null) {
+            plugin.getEntryManager().open(player, entry);
+            return true;
+        }
         if (!layouts.containsKey(id)) return false;
         final Deque<View> stack = menuStack(player);
         if (!id.equals(stack.peek().id)) stack.push(new View(id));

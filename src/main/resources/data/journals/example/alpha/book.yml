@@ -1,0 +1,6 @@
+# A book entry, opened as a written book. Each item under pages is one page, written in MiniMessage.
+# A page with more text than fits is continued on the next page, split at a space.
+
+pages:
+  - "<bold>Alpha</bold>\n\nThis entry is a <dark_green>book</dark_green>. Clicking it in the menu opens these pages."
+  - "The second item in the list is the second page."

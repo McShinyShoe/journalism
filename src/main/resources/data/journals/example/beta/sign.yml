@@ -1,0 +1,8 @@
+# A sign entry, opened as a sign. Up to 4 lines, written in MiniMessage. The sign screen shows the 16 basic
+# colours and bold, italic, underlined and strikethrough. Any other colour becomes the nearest basic one.
+
+lines:
+  - "<dark_green><bold>Beta"
+  - "is a <red>sign"
+  - ""
+  - ""

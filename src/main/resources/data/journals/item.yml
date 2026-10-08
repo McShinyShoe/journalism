@@ -5,6 +5,12 @@
 #   lore           Optional list of lore lines (MiniMessage).
 #   sort_priority  Optional whole number. Listed lowest first and ahead of everything
 #                  without one, which is listed by folder name.
+#
+# What an entry does when clicked depends on which of these files is in its folder, the first one found:
+#   inventory.yml  opens that inventory, id page/<section>/<category>/<entry>
+#   book.yml       opens a book written in MiniMessage
+#   sign.yml       opens a sign
+#   none of them   does nothing
 
 material: book
 name: "<gold>Journals"

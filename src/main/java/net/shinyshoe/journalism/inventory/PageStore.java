@@ -1,6 +1,7 @@
 package net.shinyshoe.journalism.inventory;
 
 import net.shinyshoe.journalism.Journalism;
+import net.shinyshoe.journalism.entry.EntryType;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
@@ -24,7 +25,7 @@ public final class PageStore {
     private static final Pattern NAME = Pattern.compile("[A-Za-z0-9_-]+");
     private static final String TEMPLATE_FOLDER = "template";
     private static final String NAME_PLACEHOLDER = "%name%";
-    private static final List<String> LEVELS = List.of("section", "category");
+    private static final List<String> LEVELS = List.of("section", "category", "entry");
 
     private final Journalism plugin;
 
@@ -54,13 +55,23 @@ public final class PageStore {
 
     public void create(final List<String> path) throws IOException {
         final Path folder = Files.createDirectory(folder(path));
-        final String template = TEMPLATE_FOLDER + "/" + LEVELS.get(path.size() - 1) + "/";
-        for (final String file : List.of(PageLoader.ITEM_FILE, PageLoader.LAYOUT_FILE)) {
-            try (InputStream input = plugin.getResource(template + file)) {
-                if (input == null) throw new IOException(template + file + " is not in the plugin jar");
-                final String text = new String(input.readAllBytes(), StandardCharsets.UTF_8);
-                Files.writeString(folder.resolve(file), text.replace(NAME_PLACEHOLDER, path.getLast()));
-            }
+        copyTemplate(folder, PageLoader.ITEM_FILE);
+        copyTemplate(folder, PageLoader.LAYOUT_FILE);
+    }
+
+    public void createEntry(final List<String> path, final EntryType type) throws IOException {
+        final Path folder = Files.createDirectory(folder(path));
+        copyTemplate(folder, PageLoader.ITEM_FILE);
+        if (type.fileName() != null) copyTemplate(folder, type.fileName());
+    }
+
+    private void copyTemplate(final Path folder, final String file) throws IOException {
+        final Path data = folder(List.of());
+        final String template = TEMPLATE_FOLDER + "/" + LEVELS.get(data.relativize(folder).getNameCount() - 1) + "/" + file;
+        try (InputStream input = plugin.getResource(template)) {
+            if (input == null) throw new IOException(template + " is not in the plugin jar");
+            final String text = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            Files.writeString(folder.resolve(file), text.replace(NAME_PLACEHOLDER, folder.getFileName().toString()));
         }
     }
 
@@ -89,8 +100,9 @@ public final class PageStore {
         final List<Path> files = new ArrayList<>();
         final Path inventories = plugin.getDataFolder().toPath().resolve(InventoryManager.FILE_NAME);
         if (Files.isRegularFile(inventories)) files.add(inventories);
+        final List<String> names = List.of(PageLoader.LAYOUT_FILE, EntryType.INVENTORY.fileName());
         try (Stream<Path> found = Files.walk(folder(List.of()), LEVELS.size() + 1)) {
-            found.filter(file -> file.getFileName().toString().equals(PageLoader.LAYOUT_FILE)).forEach(files::add);
+            found.filter(file -> names.contains(file.getFileName().toString())).forEach(files::add);
         }
         return files;
     }
@@ -134,7 +146,7 @@ public final class PageStore {
         }
     }
 
-    private Path folder(final List<String> path) {
+    public Path folder(final List<String> path) {
         Path folder = plugin.getDataFolder().toPath().resolve(PageLoader.FOLDER);
         for (final String name : path) {
             if (!isValidName(name)) throw new IllegalArgumentException("'" + name + "' is not a valid folder name");

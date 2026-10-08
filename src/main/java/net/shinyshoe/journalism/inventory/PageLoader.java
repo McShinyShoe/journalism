@@ -1,6 +1,9 @@
 package net.shinyshoe.journalism.inventory;
 
 import net.kyori.adventure.text.minimessage.ParsingException;
+import net.shinyshoe.journalism.entry.Entry;
+import net.shinyshoe.journalism.entry.EntryFiles;
+import net.shinyshoe.journalism.entry.EntryType;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.jspecify.annotations.Nullable;
 
@@ -8,7 +11,9 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -29,15 +34,16 @@ final class PageLoader {
 
     private final Consumer<String> warn;
     private final List<InventoryLayout> layouts = new ArrayList<>();
+    private final Map<String, Entry> entries = new HashMap<>();
 
     private PageLoader(final Consumer<String> warn) {
         this.warn = warn;
     }
 
-    static List<InventoryLayout> load(final File folder, final Consumer<String> warn) {
+    static Pages load(final File folder, final Consumer<String> warn) {
         final PageLoader loader = new PageLoader(warn);
         loader.loadChildren(folder, ID_ROOT, 1);
-        return loader.layouts;
+        return new Pages(loader.layouts, loader.entries);
     }
 
     private List<InventoryLayout.Item> loadChildren(final File directory, final String id, final int depth) {
@@ -58,7 +64,6 @@ final class PageLoader {
             if (item.contains(SORT_PRIORITY) && !item.isInt(SORT_PRIORITY)) {
                 throw new IllegalArgumentException(ITEM_FILE + " has a " + SORT_PRIORITY + " that is not a whole number");
             }
-            // entries have no inventory to go to yet
             final Listing listing = new Listing(
                     directory.getName(),
                     InventoryLayout.Item.parse(ITEM_FILE, item).withGoTo(id),
@@ -68,6 +73,14 @@ final class PageLoader {
             if (depth < ENTRY_DEPTH) {
                 final InventoryLayout layout = InventoryLayout.parse(id, read(directory, LAYOUT_FILE));
                 layouts.add(layout.withChildren(loadChildren(directory, id, depth + 1)));
+                return listing;
+            }
+
+            final EntryType type = EntryType.of(directory.toPath());
+            if (type == EntryType.INVENTORY) {
+                layouts.add(InventoryLayout.parse(id, read(directory, type.fileName())));
+            } else {
+                entries.put(id, EntryFiles.load(type, directory.toPath()));
             }
             return listing;
         } catch (final IllegalArgumentException | ParsingException e) {
@@ -85,5 +98,8 @@ final class PageLoader {
     }
 
     private record Listing(String name, InventoryLayout.Item item, @Nullable Integer sortPriority) {
+    }
+
+    record Pages(List<InventoryLayout> layouts, Map<String, Entry> entries) {
     }
 }

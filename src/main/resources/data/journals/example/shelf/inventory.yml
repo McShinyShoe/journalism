@@ -1,0 +1,23 @@
+# An inventory entry, id page/journals/example/shelf. Same keys as layout.yml, with nothing listed
+# in the empty slots.
+
+title: "Shelf"
+layout:
+  - "b###h####"
+  - "#   d   #"
+  - "#########"
+items:
+  "#":
+    material: gray_stained_glass_pane
+    name: " "
+  b:
+    material: arrow
+    name: "<yellow>Back"
+    function: back
+  h:
+    material: arrow
+    name: "<green>Home"
+    function: home
+  d:
+    material: diamond
+    name: "<aqua>Anything can go in here"

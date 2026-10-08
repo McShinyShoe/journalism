@@ -16,6 +16,9 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.shinyshoe.journalism.Journalism;
+import net.shinyshoe.journalism.entry.EntryFiles;
+import net.shinyshoe.journalism.entry.EntryManager;
+import net.shinyshoe.journalism.entry.EntryType;
 import net.shinyshoe.journalism.inventory.PageStore;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -27,16 +30,17 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 final class PageCommand {
 
-    static final String PERMISSION = "journalism.manage";
+    static final String PERMISSION = Journalism.MANAGE_PERMISSION;
 
     private static final List<String> LEVELS = List.of("section", "category", "entry");
     private static final int ENTRY_DEPTH = 3;
-    private static final List<String> ENTRY_ACTIONS = List.of("create", "open", "edit", "delete");
+    private static final String TYPE = "type";
     private static final String CONFIRM = "confirm";
     private static final String NEW_NAME = "new_name";
     private static final String MATERIAL = "material";
@@ -47,7 +51,10 @@ final class PageCommand {
             "<yellow>/journal section \\<create|open|delete> \\<section>",
             "<yellow>/journal category \\<create|open|delete> \\<section> \\<category>",
             "<yellow>/journal \\<section|category> rename \\<names> \\<new name>",
-            "<yellow>/journal entry \\<create|open|edit|delete> \\<section> \\<category> \\<entry> <dark_gray>- <white>Does nothing yet",
+            "<yellow>/journal entry create \\<section> \\<category> \\<entry> [" + String.join("|", EntryType.NAMES) + "]",
+            "<yellow>/journal entry \\<open|edit|delete> \\<section> \\<category> \\<entry>",
+            "<yellow>/journal entry edit \\<section> \\<category> \\<entry> chat <dark_gray>- <white>Write a book or sign in chat",
+            "<yellow>/journal edit \\<save|cancel|restart> <dark_gray>- <white>End or redo chat editing",
             "<yellow>/journal \\<section|category|entry> item set material \\<names> [material] <dark_gray>- <white>Item in hand if left out",
             "<yellow>/journal \\<section|category|entry> item set name \\<names> \\<name>"
     ).map(MINI_MESSAGE::deserialize).toList();
@@ -67,7 +74,25 @@ final class PageCommand {
 
     static List<LiteralArgumentBuilder<CommandSourceStack>> nodes(final Journalism plugin) {
         final PageCommand command = new PageCommand(plugin);
-        return Stream.of(1, 2, ENTRY_DEPTH).map(command::node).toList();
+        return List.of(command.node(1), command.node(2), command.node(ENTRY_DEPTH), command.chatEditNode());
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> chatEditNode() {
+        return Commands.literal("edit")
+                .requires(source -> source.getSender().hasPermission(PERMISSION))
+                .then(Commands.literal("save").executes(context -> chatEdit(context, EntryManager::saveChatEdit)))
+                .then(Commands.literal("cancel").executes(context -> chatEdit(context, EntryManager::cancelChatEdit)))
+                .then(Commands.literal("restart").executes(context -> chatEdit(context, EntryManager::restartChatEdit)));
+    }
+
+    private int chatEdit(final CommandContext<CommandSourceStack> context,
+                         final BiPredicate<EntryManager, Player> action) throws CommandSyntaxException {
+        final Player player = context.getSource().getPlayerOrThrow();
+        if (!action.test(plugin.getEntryManager(), player)) {
+            player.sendMessage(MINI_MESSAGE.deserialize("<red>You are not editing an entry in chat."));
+            return 0;
+        }
+        return Command.SINGLE_SUCCESS;
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> node(final int depth) {
@@ -75,9 +100,19 @@ final class PageCommand {
                 .requires(source -> source.getSender().hasPermission(PERMISSION));
 
         if (depth == ENTRY_DEPTH) {
-            for (final String action : ENTRY_ACTIONS) {
-                node.then(Commands.literal(action).then(names(depth, true, last -> last.executes(this::nothingYet))));
-            }
+            node.then(Commands.literal("create").then(names(depth, false, last -> last
+                    .executes(context -> createEntry(context, EntryType.NONE.commandName()))
+                    .then(Commands.argument(TYPE, StringArgumentType.word())
+                            .suggests((context, builder) -> {
+                                EntryType.NAMES.stream().filter(name -> name.startsWith(builder.getRemainingLowerCase())).forEach(builder::suggest);
+                                return builder.buildFuture();
+                            })
+                            .executes(context -> createEntry(context, StringArgumentType.getString(context, TYPE)))))));
+            node.then(Commands.literal("open").then(names(depth, true, last -> last.executes(context -> run(context, Action.OPEN, depth, false)))));
+            node.then(Commands.literal("edit").then(names(depth, true, last -> last
+                    .executes(context -> editEntry(context, false))
+                    .then(Commands.literal("chat").executes(context -> editEntry(context, true))))));
+            node.then(Commands.literal("delete").then(names(depth, true, last -> last.executes(context -> run(context, Action.DELETE, depth, false)))));
         } else {
             for (final Action action : Action.values()) {
                 node.then(Commands.literal(action.name().toLowerCase(Locale.ROOT)).then(names(depth, action != Action.CREATE, last -> {
@@ -150,8 +185,62 @@ final class PageCommand {
         }
     }
 
-    private int nothingYet(final CommandContext<CommandSourceStack> context) {
-        context.getSource().getSender().sendMessage(MINI_MESSAGE.deserialize("<gray>That entry command does nothing yet."));
+    private int createEntry(final CommandContext<CommandSourceStack> context, final String typeName) {
+        final CommandSender sender = context.getSource().getSender();
+        final List<String> path = path(context, ENTRY_DEPTH);
+        if (!areValidNames(sender, path)) return 0;
+        final EntryType type = EntryType.byName(typeName);
+        if (type == null) return tell(sender, "<red>An entry is one of " + String.join(", ", EntryType.NAMES) + ".", path);
+
+        final PageStore store = plugin.getPageStore();
+        final List<String> parent = path.subList(0, path.size() - 1);
+        if (!store.exists(parent)) return tell(sender, "<red>There is no <page>.", parent);
+        if (store.exists(path)) return tell(sender, "<red>There is already a <page>.", path);
+
+        try {
+            store.createEntry(path, type);
+            final ItemStack held = heldItem(context);
+            if (held != null) store.setItem(path, held);
+        } catch (final IOException e) {
+            return failed(context, e);
+        }
+        tell(sender, "<green>Created <page>, type " + type.commandName() + ".", path);
+        return reload(sender);
+    }
+
+    private int editEntry(final CommandContext<CommandSourceStack> context, final boolean chat) throws CommandSyntaxException {
+        final CommandSender sender = context.getSource().getSender();
+        final List<String> path = path(context, ENTRY_DEPTH);
+        if (!areValidNames(sender, path)) return 0;
+        final PageStore store = plugin.getPageStore();
+        if (!store.exists(path)) return tell(sender, "<red>There is no <page>.", path);
+
+        final Player player = context.getSource().getPlayerOrThrow();
+        final EntryType type = EntryType.of(store.folder(path));
+        if (chat && (type == EntryType.BOOK || type == EntryType.SIGN)) {
+            plugin.getEntryManager().startChatEdit(player, path);
+            tell(sender, type == EntryType.SIGN
+                    ? "<green>Chat editing the <page>. Your next " + EntryFiles.SIGN_LINES + " messages become its lines, then it saves."
+                    + " /journal edit save ends early, cancel and restart work too."
+                    : "<green>Chat editing the <page>. Every message you send becomes a page."
+                    + " Finish with /journal edit save, or use /journal edit cancel or restart.", path);
+            return Command.SINGLE_SUCCESS;
+        }
+        switch (type) {
+            case BOOK -> {
+                if (!plugin.getEntryManager().giveEditBook(player, path)) {
+                    return tell(sender, "<red>Your inventory has no room for the book.", path);
+                }
+                tell(sender, "<green>Open the book to edit the <page>. Done or signing saves it, throwing the book away cancels.", path);
+            }
+            case SIGN -> plugin.getEntryManager().editSign(player, path);
+            case INVENTORY -> {
+                return tell(sender, "<red>The <page> is an inventory, change its inventory.yml instead.", path);
+            }
+            case NONE -> {
+                return tell(sender, "<red>The <page> has nothing to edit.", path);
+            }
+        }
         return Command.SINGLE_SUCCESS;
     }
 
@@ -172,6 +261,9 @@ final class PageCommand {
     private int open(final CommandContext<CommandSourceStack> context, final List<String> path) throws CommandSyntaxException {
         final CommandSender sender = context.getSource().getSender();
         if (!plugin.getPageStore().exists(path)) return tell(sender, "<red>There is no <page>.", path);
+        if (path.size() == ENTRY_DEPTH && EntryType.of(plugin.getPageStore().folder(path)) == EntryType.NONE) {
+            return tell(sender, "<gray>The <page> has nothing to open.", path);
+        }
         if (!plugin.getInventoryManager().goTo(context.getSource().getPlayerOrThrow(), PageStore.id(path))) {
             return tell(sender, "<red>The <page> could not be loaded, see the console.", path);
         }
