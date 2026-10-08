@@ -6,6 +6,9 @@ api-version: '26.2'
 load: POSTWORLD
 
 permissions:
+  journalism.use:
+    description: Use /journal and /journal help
+    default: true
   journalism.reload:
     description: Use /journal reload
     default: op

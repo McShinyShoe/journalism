@@ -21,6 +21,7 @@ public final class JournalCommand {
 
     private static final String LABEL = "journal";
     private static final String DESCRIPTION = "Open the journal menu";
+    private static final String USE_PERMISSION = "journalism.use";
     private static final String RELOAD_PERMISSION = "journalism.reload";
 
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
@@ -48,6 +49,7 @@ public final class JournalCommand {
 
     private LiteralCommandNode<CommandSourceStack> build() {
         final LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal(LABEL)
+                .requires(source -> source.getSender().hasPermission(USE_PERMISSION))
                 .executes(this::openMenu)
                 .then(Commands.literal("help").executes(this::help))
                 .then(Commands.literal("reload")
