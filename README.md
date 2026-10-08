@@ -13,6 +13,7 @@ Requires `Paper 26.2` and `Java 25`.
 - [Folder structure](#folder-structure)
 - [File formats](#file-formats)
 - [Commands](#commands)
+- [Permissions](#permissions)
 
 ## How sections, categories and entries work
 
@@ -322,11 +323,11 @@ One inventory, written like a `layout.yml`. Nothing is listed in its empty slots
 
 | Command           | Permission          | What it does                                       |
 |-------------------|---------------------|----------------------------------------------------|
-| `/journal`        | none                | Opens the menu on the page you were last on.       |
-| `/journal help`   | none                | Lists the commands you are allowed to use.         |
+| `/journal`        | `journalism.use`    | Opens the menu on the page you were last on.       |
+| `/journal help`   | `journalism.use`    | Lists the commands you are allowed to use.         |
 | `/journal reload` | `journalism.reload` | Reads the files again and refreshes open menus.    |
 
-Both permissions default to operators.
+Every player has `journalism.use` by default. See [Permissions](#permissions) for the rest.
 
 ### Managing pages
 
@@ -410,4 +411,29 @@ Then add a button to `inventory.yml` so players can reach the new section, and r
       material: dragon_head
       name: "<dark_purple>Lore"
       goto: page/lore
+```
+
+## Permissions
+
+| Permission          | Default   | Allows                                                                          |
+|---------------------|-----------|---------------------------------------------------------------------------------|
+| `journalism.use`    | everyone  | `/journal` and `/journal help`.                                                 |
+| `journalism.reload` | operators | `/journal reload`.                                                              |
+| `journalism.manage` | operators | `/journal section`, `/journal category`, `/journal entry` and `/journal edit`.  |
+
+- `journalism.use` is the permission for the `/journal` command itself. Someone without it cannot use any
+  part of the command, so `journalism.reload` and `journalism.manage` only work together with it.
+- A command you are not allowed to use is hidden. It is not suggested with tab, the server answers as if it
+  does not exist, and `/journal help` leaves it out.
+- `journalism.manage` covers everything that creates, renames, deletes or edits a page, and `open` as well.
+- There are no permissions for single pages. Everyone who can open `/journal` can read every section,
+  category and entry that a button leads to.
+- The console can use every command that does not need a player.
+
+To change who has a permission, use a permissions plugin. With LuckPerms, for example:
+
+```
+/lp group default permission set journalism.use false
+/lp group builder permission set journalism.manage true
+/lp user Steve permission set journalism.reload true
 ```
