@@ -10,8 +10,10 @@
 main:
   title: "Journalism"
   layout:
-    - "########s"
-    - "#   j   #"
+    - "#########"
+    - "#       #"
+    - "#   j s #"
+    - "#       #"
     - "#########"
   items:
     "#":
@@ -24,6 +26,6 @@ main:
         - "<white>Access the journal you have found"
     s:
       material: redstone_torch
-      name: "<light_gray>Settings"
+      name: "<gray>Settings"
       lore:
         - "<white>Change Settings"
