@@ -10,21 +10,27 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
 import java.io.File;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 public final class InventoryManager {
 
     private static final String FILE_NAME = "inventory.yml";
+    private static final String HOME_ID = "main";
 
     private final Journalism plugin;
     private final Map<String, InventoryLayout> layouts = new HashMap<>();
     private final Map<String, Map<Character, Consumer<InventoryClickEvent>>> clickHandlers = new HashMap<>();
+    private final Map<UUID, Deque<String>> menuStacks = new HashMap<>();
 
     public InventoryManager(final Journalism plugin) {
         this.plugin = plugin;
@@ -49,13 +55,53 @@ public final class InventoryManager {
                 plugin.getLogger().warning("Skipping inventory '" + id + "' in " + FILE_NAME + ": " + e.getMessage());
             }
         }
+
+        for (final InventoryLayout layout : layouts.values()) {
+            layout.items().forEach((symbol, item) -> {
+                if (item.goTo() != null && !layouts.containsKey(item.goTo())) {
+                    plugin.getLogger().warning("Inventory '" + layout.id() + "' item '" + symbol + "' in " + FILE_NAME
+                            + " goes to '" + item.goTo() + "', which is not a loaded inventory");
+                }
+            });
+        }
     }
 
-    public boolean open(final Player player, final String id) {
-        final InventoryLayout layout = layouts.get(id);
+    // opens the menu the player was last on
+    public boolean open(final Player player) {
+        final Deque<String> stack = menuStack(player);
+
+        // reset when reloaded
+        while (!stack.isEmpty() && !layouts.containsKey(stack.peek())) stack.pop();
+
+        final InventoryLayout layout = layouts.get(stack.isEmpty() ? HOME_ID : stack.peek());
         if (layout == null) return false;
         player.openInventory(new LayoutHolder(layout).getInventory());
         return true;
+    }
+
+    public void goTo(final Player player, final String id) {
+        if (!layouts.containsKey(id)) return;
+        final Deque<String> stack = menuStack(player);
+        if (!id.equals(stack.isEmpty() ? HOME_ID : stack.peek())) stack.push(id);
+        open(player);
+    }
+
+    public void back(final Player player) {
+        final Deque<String> stack = menuStack(player);
+        if (stack.isEmpty()) return;
+        stack.pop();
+        open(player);
+    }
+
+    public void home(final Player player) {
+        final Deque<String> stack = menuStack(player);
+        if (stack.isEmpty()) return;
+        stack.clear();
+        open(player);
+    }
+
+    private Deque<String> menuStack(final Player player) {
+        return menuStacks.computeIfAbsent(player.getUniqueId(), key -> new ArrayDeque<>());
     }
 
     public void onClick(final String id, final char symbol, final Consumer<InventoryClickEvent> handler) {
@@ -103,6 +149,24 @@ public final class InventoryManager {
                     .getOrDefault(holder.layout.id(), Map.of())
                     .get(holder.layout.symbolAt(slot));
             if (handler != null) handler.accept(event);
+
+            final InventoryLayout.Item item = holder.layout.itemAt(slot);
+            if (item == null || !(event.getWhoClicked() instanceof Player player)) return;
+            final String goTo = item.goTo();
+            final InventoryLayout.Function function = item.function();
+            if (goTo == null && function == null) return;
+
+            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                if (player.getOpenInventory().getTopInventory().getHolder(false) != holder) return;
+                if (goTo != null) {
+                    goTo(player, goTo);
+                    return;
+                }
+                switch (function) {
+                    case BACK -> back(player);
+                    case HOME -> home(player);
+                }
+            });
         }
 
         @EventHandler
@@ -110,6 +174,11 @@ public final class InventoryManager {
             if (event.getInventory().getHolder(false) instanceof LayoutHolder) {
                 event.setCancelled(true);
             }
+        }
+
+        @EventHandler
+        public void onPlayerQuit(final PlayerQuitEvent event) {
+            menuStacks.remove(event.getPlayer().getUniqueId());
         }
     }
 }

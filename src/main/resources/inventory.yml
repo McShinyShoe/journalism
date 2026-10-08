@@ -1,4 +1,4 @@
-# Each top-level key is the id of one chest inventory:
+# Each top-level key is the id of one chest inventory, main is the one /journal starts on:
 #   title   Text shown at the top of the inventory (MiniMessage).
 #   layout  1 to 6 rows of exactly 9 characters, one character per slot.
 #           A space is an empty slot, any other character must be defined in items.
@@ -6,6 +6,10 @@
 #             material  Item id, for example book or minecraft:book.
 #             name      Optional item name (MiniMessage).
 #             lore      Optional list of lore lines (MiniMessage).
+#             goto      Optional id of the inventory to open when the item is clicked.
+#             function  Optional button function, cannot be combined with goto:
+#                         back  Return to the previous inventory.
+#                         home  Return to main.
 
 main:
   title: "Journalism"
@@ -24,8 +28,48 @@ main:
       name: "<gold>Journals"
       lore:
         - "<white>Access the journal you have found"
+      goto: journals
     s:
       material: redstone_torch
       name: "<gray>Settings"
       lore:
         - "<white>Change Settings"
+      goto: settings
+
+journals:
+  title: "Journals"
+  layout:
+    - "#########"
+    - "#       #"
+    - "b###h####"
+  items:
+    "#":
+      material: gray_stained_glass_pane
+      name: " "
+    b:
+      material: arrow
+      name: "<yellow>Back"
+      function: back
+    h:
+      material: arrow
+      name: "<green>Home"
+      function: home
+
+settings:
+  title: "Settings"
+  layout:
+    - "#########"
+    - "#       #"
+    - "b###h####"
+  items:
+    "#":
+      material: gray_stained_glass_pane
+      name: " "
+    b:
+      material: arrow
+      name: "<yellow>Back"
+      function: back
+    h:
+      material: arrow
+      name: "<green>Home"
+      function: home

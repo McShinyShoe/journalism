@@ -67,7 +67,8 @@ public record InventoryLayout(String id, Component title, List<String> rows, Map
         return items.get(symbolAt(slot));
     }
 
-    public record Item(Material material, @Nullable Component name, List<Component> lore) {
+    public record Item(Material material, @Nullable Component name, List<Component> lore,
+                       @Nullable String goTo, @Nullable Function function) {
 
         private static Item parse(final String symbol, final ConfigurationSection section) {
             final String materialName = section.getString("material", "");
@@ -76,11 +77,19 @@ public record InventoryLayout(String id, Component title, List<String> rows, Map
                 throw new IllegalArgumentException("item '" + symbol + "' has material '" + materialName + "', which is not an item");
             }
 
+            final String goTo = section.getString("goto");
+            final String function = section.getString("function");
+            if (goTo != null && function != null) {
+                throw new IllegalArgumentException("item '" + symbol + "' cannot have both goto and function");
+            }
+
             final String name = section.getString("name");
             return new Item(
                     material,
                     name == null ? null : text(name),
-                    section.getStringList("lore").stream().map(Item::text).toList()
+                    section.getStringList("lore").stream().map(Item::text).toList(),
+                    goTo,
+                    function == null ? null : Function.parse(symbol, function)
             );
         }
 
@@ -96,6 +105,18 @@ public record InventoryLayout(String id, Component title, List<String> rows, Map
                 if (!lore.isEmpty()) meta.lore(lore);
             });
             return stack;
+        }
+    }
+
+    public enum Function {
+        BACK,
+        HOME;
+
+        private static Function parse(final String symbol, final String name) {
+            for (final Function function : values()) {
+                if (function.name().equalsIgnoreCase(name)) return function;
+            }
+            throw new IllegalArgumentException("item '" + symbol + "' has function '" + name + "', which is not one of back, home");
         }
     }
 }

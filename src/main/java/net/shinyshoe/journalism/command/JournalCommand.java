@@ -19,7 +19,6 @@ public final class JournalCommand {
 
     private static final String LABEL = "journal";
     private static final String DESCRIPTION = "Open the journal menu";
-    private static final String MENU_ID = "main";
 
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
     private static final Component MENU_UNAVAILABLE = MINI_MESSAGE.deserialize("<red>The journal menu is unavailable.");
@@ -50,7 +49,7 @@ public final class JournalCommand {
 
     private int openMenu(final CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         final Player player = context.getSource().getPlayerOrThrow();
-        if (!plugin.getInventoryManager().open(player, MENU_ID)) {
+        if (!plugin.getInventoryManager().open(player)) {
             player.sendMessage(MENU_UNAVAILABLE);
             return 0;
         }
