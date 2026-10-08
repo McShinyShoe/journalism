@@ -2,6 +2,7 @@ package net.shinyshoe.journalism;
 
 import net.shinyshoe.journalism.command.JournalCommand;
 import net.shinyshoe.journalism.inventory.InventoryManager;
+import net.shinyshoe.journalism.inventory.PageStore;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
@@ -11,10 +12,12 @@ import java.util.jar.JarFile;
 public final class Journalism extends JavaPlugin {
 
     private InventoryManager inventoryManager;
+    private PageStore pageStore;
 
     @Override
     public void onEnable() {
         inventoryManager = new InventoryManager(this);
+        pageStore = new PageStore(this);
         JournalCommand.register(this);
     }
 
@@ -27,6 +30,10 @@ public final class Journalism extends JavaPlugin {
 
     public InventoryManager getInventoryManager() {
         return inventoryManager;
+    }
+
+    public PageStore getPageStore() {
+        return pageStore;
     }
 
     public void saveResources(final String folder) {

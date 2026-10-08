@@ -9,3 +9,6 @@ permissions:
   journalism.reload:
     description: Use /journal reload
     default: op
+  journalism.manage:
+    description: Use /journal section, /journal category and /journal entry
+    default: op

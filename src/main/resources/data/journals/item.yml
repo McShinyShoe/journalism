@@ -1,5 +1,6 @@
 # The item that stands for this section, category or entry wherever it is listed:
 #   material       Item id, for example book or minecraft:book.
+#   head           Optional, for player_head: a player name, or the texture value of a custom head.
 #   name           Optional item name (MiniMessage).
 #   lore           Optional list of lore lines (MiniMessage).
 #   sort_priority  Optional whole number. Listed lowest first and ahead of everything

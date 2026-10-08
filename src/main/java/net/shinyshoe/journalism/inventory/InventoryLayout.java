@@ -1,5 +1,8 @@
 package net.shinyshoe.journalism.inventory;
 
+import com.destroystokyo.paper.profile.ProfileProperty;
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.ResolvableProfile;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -106,15 +109,24 @@ public record InventoryLayout(String id, Component title, List<String> rows, Map
         return text -> text.replaceText(current).replaceText(total);
     }
 
-    public record Item(Material material, @Nullable Component name, List<Component> lore,
+    public record Item(Material material, @Nullable ResolvableProfile head, @Nullable Component name, List<Component> lore,
                        @Nullable String goTo, @Nullable Function function) {
 
+        static final String MATERIAL = "material";
+        static final String HEAD = "head";
+        static final String NAME = "name";
+
+        private static final String TEXTURES = "textures";
+        private static final int MAX_PLAYER_NAME_LENGTH = 16;
+
         static Item parse(final String label, final ConfigurationSection section) {
-            final String materialName = section.getString("material", "");
+            final String materialName = section.getString(MATERIAL, "");
             final Material material = Material.matchMaterial(materialName);
             if (material == null || !material.isItem()) {
                 throw new IllegalArgumentException(label + " has material '" + materialName + "', which is not an item");
             }
+
+            final String head = material == Material.PLAYER_HEAD ? section.getString(HEAD) : null;
 
             final String goTo = section.getString("goto");
             final String function = section.getString("function");
@@ -122,9 +134,10 @@ public record InventoryLayout(String id, Component title, List<String> rows, Map
                 throw new IllegalArgumentException(label + " cannot have both goto and function");
             }
 
-            final String name = section.getString("name");
+            final String name = section.getString(NAME);
             return new Item(
                     material,
+                    head == null ? null : profile(label, head),
                     name == null ? null : text(name),
                     section.getStringList("lore").stream().map(Item::text).toList(),
                     goTo,
@@ -133,11 +146,34 @@ public record InventoryLayout(String id, Component title, List<String> rows, Map
         }
 
         Item withGoTo(final String goTo) {
-            return new Item(material, name, lore, goTo, null);
+            return new Item(material, head, name, lore, goTo, null);
         }
 
         private Item withText(final UnaryOperator<Component> text) {
-            return new Item(material, name == null ? null : text.apply(name), lore.stream().map(text).toList(), goTo, function);
+            return new Item(material, head, name == null ? null : text.apply(name), lore.stream().map(text).toList(), goTo, function);
+        }
+
+        // a player name, or like the longer texture value of a custom head
+        private static ResolvableProfile profile(final String label, final String head) {
+            final ResolvableProfile.Builder profile = ResolvableProfile.resolvableProfile();
+            if (head.length() > MAX_PLAYER_NAME_LENGTH) {
+                return profile.addProperty(new ProfileProperty(TEXTURES, head)).build();
+            }
+            try {
+                return profile.name(head).build();
+            } catch (final IllegalArgumentException e) {
+                throw new IllegalArgumentException(label + " has head '" + head + "', which is not a player name or a texture value");
+            }
+        }
+
+        @Nullable
+        static String headOf(final ItemStack stack) {
+            final ResolvableProfile profile = stack.getData(DataComponentTypes.PROFILE);
+            if (stack.getType() != Material.PLAYER_HEAD || profile == null) return null;
+            for (final ProfileProperty property : profile.properties()) {
+                if (property.getName().equals(TEXTURES)) return property.getValue();
+            }
+            return profile.name();
         }
 
         // names and lore italic by default
@@ -147,6 +183,7 @@ public record InventoryLayout(String id, Component title, List<String> rows, Map
 
         public ItemStack createStack() {
             final ItemStack stack = ItemStack.of(material);
+            if (head != null) stack.setData(DataComponentTypes.PROFILE, head);
             stack.editMeta(meta -> {
                 if (name != null) meta.customName(name);
                 if (!lore.isEmpty()) meta.lore(lore);

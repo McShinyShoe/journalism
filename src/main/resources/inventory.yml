@@ -4,6 +4,7 @@
 #           A space is an empty slot, any other character must be defined in items.
 #   items   The item each layout character stands for:
 #             material  Item id, for example book or minecraft:book.
+#             head      Optional, for player_head: a player name, or the texture value of a custom head.
 #             name      Optional item name (MiniMessage).
 #             lore      Optional list of lore lines (MiniMessage).
 #             goto      Optional id of the inventory to open when the item is clicked.

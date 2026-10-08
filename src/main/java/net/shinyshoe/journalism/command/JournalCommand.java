@@ -1,6 +1,7 @@
 package net.shinyshoe.journalism.command;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -46,13 +47,14 @@ public final class JournalCommand {
     }
 
     private LiteralCommandNode<CommandSourceStack> build() {
-        return Commands.literal(LABEL)
+        final LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal(LABEL)
                 .executes(this::openMenu)
                 .then(Commands.literal("help").executes(this::help))
                 .then(Commands.literal("reload")
                         .requires(source -> source.getSender().hasPermission(RELOAD_PERMISSION))
-                        .executes(this::reload))
-                .build();
+                        .executes(this::reload));
+        PageCommand.nodes(plugin).forEach(root::then);
+        return root.build();
     }
 
     private int openMenu(final CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
@@ -68,6 +70,7 @@ public final class JournalCommand {
         final CommandSender sender = context.getSource().getSender();
         HELP.forEach(sender::sendMessage);
         if (sender.hasPermission(RELOAD_PERMISSION)) sender.sendMessage(HELP_RELOAD);
+        if (sender.hasPermission(PageCommand.PERMISSION)) PageCommand.HELP.forEach(sender::sendMessage);
         return Command.SINGLE_SUCCESS;
     }
 

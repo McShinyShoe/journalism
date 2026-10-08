@@ -16,9 +16,9 @@ final class PageLoader {
 
     static final String FOLDER = "data";
 
-    private static final String ID_ROOT = "page";
-    private static final String LAYOUT_FILE = "layout.yml";
-    private static final String ITEM_FILE = "item.yml";
+    static final String ID_ROOT = "page";
+    static final String LAYOUT_FILE = "layout.yml";
+    static final String ITEM_FILE = "item.yml";
     private static final String SORT_PRIORITY = "sort_priority";
     private static final int ENTRY_DEPTH = 3;
 

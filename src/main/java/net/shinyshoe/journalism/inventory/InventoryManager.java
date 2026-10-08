@@ -25,7 +25,7 @@ import java.util.function.Consumer;
 
 public final class InventoryManager {
 
-    private static final String FILE_NAME = "inventory.yml";
+    static final String FILE_NAME = "inventory.yml";
     private static final String HOME_ID = "main";
 
     private final Journalism plugin;
@@ -113,11 +113,11 @@ public final class InventoryManager {
         return true;
     }
 
-    public void goTo(final Player player, final String id) {
-        if (!layouts.containsKey(id)) return;
+    public boolean goTo(final Player player, final String id) {
+        if (!layouts.containsKey(id)) return false;
         final Deque<View> stack = menuStack(player);
         if (!id.equals(stack.peek().id)) stack.push(new View(id));
-        open(player);
+        return open(player);
     }
 
     public void back(final Player player) {
@@ -153,6 +153,17 @@ public final class InventoryManager {
         });
     }
 
+    // used to keep all of the players on a page whose id changed
+    public void renamePage(final String from, final String to) {
+        for (final Deque<View> stack : menuStacks.values()) {
+            for (final View view : stack) {
+                if (view.id.equals(from) || view.id.startsWith(from + "/")) {
+                    view.id = to + view.id.substring(from.length());
+                }
+            }
+        }
+    }
+
     public void onClick(final String id, final char symbol, final Consumer<InventoryClickEvent> handler) {
         clickHandlers.computeIfAbsent(id, key -> new HashMap<>()).put(symbol, handler);
     }
@@ -166,7 +177,7 @@ public final class InventoryManager {
     }
 
     private static final class View {
-        private final String id;
+        private String id;
         private int page;
 
         private View(final String id) {
